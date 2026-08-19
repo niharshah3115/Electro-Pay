@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Building2, MessageSquare, Clock, Save, Smartphone, Download } from 'lucide-react';
+import { Building2, MessageSquare, Clock, Save, Smartphone, Download, Cloud, ShieldCheck } from 'lucide-react';
 import { useBusiness } from '../context/BusinessContext';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { usePWA } from '../context/PWAContext';
 import { Input } from '../components/common/Input';
@@ -9,6 +10,7 @@ import { Badge } from '../components/common/Badge';
 
 export function SettingsPage() {
   const { businessProfile, updateBusinessProfile, reminderTemplates, updateReminderTemplates } = useBusiness();
+  const { isCloudConnected, currentUser } = useAuth();
   const { isInstalled, isInstallable, promptInstall, isIOS, isOnline } = usePWA();
   const { success } = useToast();
 
@@ -57,6 +59,50 @@ export function SettingsPage() {
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
           Configure distributor profile, standard 39-day credit policy, PWA installation, and automated WhatsApp reminder formats.
         </p>
+      </div>
+
+      {/* Cloud Database & Multi-Device Sync Status */}
+      <div className="rounded-2xl bg-slate-900/90 border border-slate-800 p-6 space-y-4 shadow-xl">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800 flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${
+              isCloudConnected
+                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                : 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+            }`}>
+              <Cloud className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">Multi-Device Cloud Sync</h2>
+              <p className="text-xs text-slate-400">Google Cloud Firestore & Firebase Authentication</p>
+            </div>
+          </div>
+
+          <div>
+            {isCloudConnected ? (
+              <Badge variant="emerald" dot size="md">
+                Live Cloud Sync Active ✓
+              </Badge>
+            ) : (
+              <Badge variant="amber" size="md">
+                Local Storage Mode
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <div className="pt-1 space-y-2">
+          <p className="text-xs sm:text-sm font-semibold text-slate-200">
+            {isCloudConnected
+              ? 'Your account and data are synchronized across all devices in real-time.'
+              : 'App is running in browser local storage mode.'}
+          </p>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            {isCloudConnected
+              ? `Connected to Firebase project (electro-pay-bc98c). Any changes made on this PC or on your mobile device update automatically everywhere.`
+              : 'Data is only stored on this individual browser. Connect Firebase in .env to enable multi-device sync.'}
+          </p>
+        </div>
       </div>
 
       {/* App Installation Status Section */}

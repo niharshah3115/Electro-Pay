@@ -16,7 +16,7 @@ import { formatINR } from '../../utils/currencyUtils';
 
 export function Sidebar({ onClose }) {
   const { shopkeepers = [], payments = [], businessProfile = {} } = useBusiness();
-  const { logout, currentUser } = useAuth();
+  const { logout, currentUser, isCloudConnected } = useAuth();
 
   const totalOutstanding = (shopkeepers || []).reduce((sum, sk) => sum + (Number(sk?.totalOutstanding) || 0), 0);
   const shopkeepersWithDue = (shopkeepers || []).filter((sk) => (sk?.totalOutstanding || 0) > 0).length;
@@ -110,6 +110,20 @@ export function Sidebar({ onClose }) {
 
       {/* Footer / Profile & Logout */}
       <div className="space-y-3 pt-4 border-t border-slate-800/80">
+        <div className="px-2">
+          {isCloudConnected ? (
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2.5 py-1 rounded-lg">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Multi-Device Cloud Sync Active</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-amber-400 bg-amber-950/40 border border-amber-800/40 px-2.5 py-1 rounded-lg">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span>Local Storage (Single Device)</span>
+            </div>
+          )}
+        </div>
+
         <div className="flex items-center justify-between px-2 pt-1">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-brand-400 shrink-0">
