@@ -37,7 +37,11 @@ export function generateTelUrl(phone) {
 export function generatePersonalizedReminderMessage(shopkeeper, timing = {}) {
   const ownerName = shopkeeper.ownerName || shopkeeper.shopName || 'Customer';
   const dueAmount = Number(shopkeeper.totalOutstanding) || 0;
-  const invoiceNumber = shopkeeper.invoiceNumber || `INV-${shopkeeper.id ? shopkeeper.id.slice(-4) : '1001'}`;
+  const isWithoutBill = shopkeeper.billingType === 'without_bill' || !!shopkeeper.challanNumber;
+  const docTypeLabel = isWithoutBill ? 'Challan/Slip' : 'Invoice';
+  const docNumber = isWithoutBill
+    ? (shopkeeper.challanNumber || shopkeeper.invoiceNumber || 'CH-1001')
+    : (shopkeeper.invoiceNumber || `INV-${shopkeeper.id ? shopkeeper.id.slice(-4) : '1001'}`);
 
   let dueStatusText = 'is due today';
   if (timing?.isOverdue) {
@@ -50,7 +54,7 @@ export function generatePersonalizedReminderMessage(shopkeeper, timing = {}) {
 
   return `Hello ${ownerName},
 
-Your payment of ₹${dueAmount.toLocaleString('en-IN')} for invoice ${invoiceNumber} ${dueStatusText}.
+Your payment of ₹${dueAmount.toLocaleString('en-IN')} for ${docTypeLabel} ${docNumber} ${dueStatusText}.
 
 Kindly arrange the payment at your earliest convenience.
 

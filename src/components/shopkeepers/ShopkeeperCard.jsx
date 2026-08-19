@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Phone, MessageSquare, Receipt, User, Store, Trash2, Edit2, CheckCircle2, Calendar } from 'lucide-react';
+import { Phone, MessageSquare, Receipt, User, Store, Trash2, Edit2, CheckCircle2, Calendar, FileText, Package } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -24,6 +24,11 @@ export function ShopkeeperCard({
   const totalPaid = Number(shopkeeper.totalPaidAmount) || 0;
   const totalBillAmount = (outstanding + totalPaid) || Number(shopkeeper.billAmount) || 0;
 
+  const isWithoutBill = shopkeeper.billingType === 'without_bill' || !!shopkeeper.challanNumber;
+  const docNumber = isWithoutBill
+    ? (shopkeeper.challanNumber || shopkeeper.invoiceNumber || 'CH-GENERAL')
+    : (shopkeeper.invoiceNumber || 'INV-GENERAL');
+
   const handleCallClick = () => {
     setTimeout(() => {
       onOpenLogCall(shopkeeper);
@@ -46,7 +51,7 @@ export function ShopkeeperCard({
     <>
       <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl hover:border-slate-700 transition-all flex flex-col justify-between space-y-4">
         {/* Top Header: Shopkeeper Name & Business Name */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div className="flex items-start justify-between gap-3">
             <div>
               {/* Shopkeeper Name */}
@@ -95,8 +100,23 @@ export function ShopkeeperCard({
             </div>
           </div>
 
+          {/* With Bill / Without Bill Badge Pill */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {isWithoutBill ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                <Package className="w-3 h-3 text-amber-400" />
+                <span>Without Bill: <strong className="text-white font-mono">#{docNumber}</strong></span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30">
+                <FileText className="w-3 h-3 text-brand-400" />
+                <span>Invoice: <strong className="text-white font-mono">#{docNumber}</strong></span>
+              </span>
+            )}
+          </div>
+
           {/* Phone & Delivery Date Row */}
-          <div className="flex items-center justify-between text-xs text-slate-400 flex-wrap gap-2">
+          <div className="flex items-center justify-between text-xs text-slate-400 flex-wrap gap-2 pt-0.5">
             <div className="flex items-center gap-1.5 font-mono text-slate-300">
               <Phone className="w-3.5 h-3.5 text-brand-400" />
               <span>{shopkeeper.phone}</span>

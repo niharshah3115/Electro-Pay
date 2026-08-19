@@ -49,11 +49,16 @@ export function generateShopkeeperStatementPDF({
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(14, 54, 182, 34, 3, 3, 'FD');
 
+  const isWithoutBill = shopkeeper.billingType === 'without_bill' || !!shopkeeper.challanNumber;
+  const docRefText = isWithoutBill
+    ? `Without Bill (Challan #${shopkeeper.challanNumber || shopkeeper.invoiceNumber || 'CH-GENERAL'})`
+    : `With Bill (Invoice #${shopkeeper.invoiceNumber || 'INV-GENERAL'})`;
+
   doc.setFont('helvetica', 'bold');
   doc.text(`Customer: ${shopkeeper.shopName}`, 20, 63);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Proprietor: ${shopkeeper.ownerName || 'N/A'} | Goods Delivered: ${formatDate(shopkeeper.deliveryDate || shopkeeper.invoiceDate || shopkeeper.createdAt)}`, 20, 71);
-  doc.text(`Phone: ${shopkeeper.phone} | Route: ${shopkeeper.areaRoute || 'General'}`, 20, 79);
+  doc.text(`Proprietor: ${shopkeeper.ownerName || 'N/A'} | Billing: ${docRefText}`, 20, 71);
+  doc.text(`Phone: ${shopkeeper.phone} | Goods Delivered: ${formatDate(shopkeeper.deliveryDate || shopkeeper.invoiceDate || shopkeeper.createdAt)}`, 20, 79);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Total Bill Amount:', 120, 63);

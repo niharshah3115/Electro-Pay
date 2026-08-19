@@ -132,15 +132,25 @@ export function ShopkeeperDetailPage() {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-y-1.5 gap-x-4 text-xs text-slate-400">
               <div className="flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-slate-200">{shopkeeper.ownerName || 'Proprietor'}</span>
+                <span className="text-slate-200 font-semibold">{shopkeeper.ownerName || 'Proprietor'}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-brand-400" />
-                <span>{shopkeeper.areaRoute || 'General Area'}, {shopkeeper.city || 'Mumbai'}</span>
-              </div>
+
+              {/* Billing Category Pill */}
+              {(shopkeeper.billingType === 'without_bill' || !!shopkeeper.challanNumber) ? (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  <Package className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Without Bill Challan: <strong className="text-white font-mono">#{shopkeeper.challanNumber || shopkeeper.invoiceNumber || 'CH-GENERAL'}</strong></span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30">
+                  <FileText className="w-3.5 h-3.5 text-brand-400" />
+                  <span>Tax Invoice: <strong className="text-white font-mono">#{shopkeeper.invoiceNumber || 'INV-GENERAL'}</strong></span>
+                </div>
+              )}
+
               <div className="flex items-center gap-1.5">
                 <Truck className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Goods Delivered: <strong className="text-white">{formatDate(shopkeeper.deliveryDate || shopkeeper.invoiceDate || shopkeeper.createdAt)}</strong></span>

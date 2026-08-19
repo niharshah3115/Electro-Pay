@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Store, Phone, DollarSign, Calendar } from 'lucide-react';
+import { User, Store, Phone, DollarSign, Calendar, FileText, Package, Check, Hash } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
 import { Button } from '../common/Button';
@@ -15,6 +15,9 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
     phone: '',
     billAmount: '',
     deliveryDate: getTodayString(),
+    billingType: 'with_bill', // 'with_bill' | 'without_bill'
+    invoiceNumber: '',
+    challanNumber: '',
   });
 
   const [errors, setErrors] = useState({});
@@ -22,12 +25,16 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
 
   useEffect(() => {
     if (initialData) {
+      const isWithoutBill = initialData.billingType === 'without_bill' || !!initialData.challanNumber;
       setFormData({
         ownerName: initialData.ownerName || '',
         shopName: initialData.shopName || '',
         phone: initialData.phone || '',
         billAmount: String(initialData.billAmount || initialData.totalOutstanding || ''),
         deliveryDate: initialData.deliveryDate || initialData.invoiceDate || getTodayString(),
+        billingType: isWithoutBill ? 'without_bill' : 'with_bill',
+        invoiceNumber: initialData.invoiceNumber || (isWithoutBill ? '' : `INV-${Date.now().toString().slice(-4)}`),
+        challanNumber: initialData.challanNumber || (isWithoutBill ? initialData.invoiceNumber || `CH-${Date.now().toString().slice(-4)}` : ''),
       });
     } else {
       setFormData({
@@ -36,6 +43,9 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
         phone: '',
         billAmount: '',
         deliveryDate: getTodayString(),
+        billingType: 'with_bill',
+        invoiceNumber: `INV-${Date.now().toString().slice(-4)}`,
+        challanNumber: `CH-${Date.now().toString().slice(-4)}`,
       });
     }
     setErrors({});
@@ -72,6 +82,17 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
       newErrors.deliveryDate = 'Goods delivered date is required';
     }
 
+    // Conditional Validation for Bill vs Without Bill
+    if (formData.billingType === 'with_bill') {
+      if (!formData.invoiceNumber.trim()) {
+        newErrors.invoiceNumber = 'Please enter the Tax Invoice / Bill number';
+      }
+    } else {
+      if (!formData.challanNumber.trim()) {
+        newErrors.challanNumber = 'Please enter the Without Bill / Challan / Slip number';
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -80,6 +101,10 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
     setSubmitting(true);
     try {
       const numBillAmount = Number(formData.billAmount) || 0;
+      const isWithoutBill = formData.billingType === 'without_bill';
+      const activeDocNumber = isWithoutBill
+        ? formData.challanNumber.trim()
+        : formData.invoiceNumber.trim();
 
       const payload = {
         ownerName: formData.ownerName.trim(),
@@ -88,7 +113,9 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
         billAmount: numBillAmount,
         deliveryDate: formData.deliveryDate,
         dueDate: computedDueDate,
-        invoiceNumber: initialData?.invoiceNumber || `INV-${Date.now().toString().slice(-4)}`,
+        billingType: formData.billingType,
+        invoiceNumber: isWithoutBill ? activeDocNumber : formData.invoiceNumber.trim(),
+        challanNumber: isWithoutBill ? formData.challanNumber.trim() : '',
       };
 
       if (initialData) {
@@ -108,30 +135,31 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialData ? 'Edit Shopkeeper' : 'Add Shopkeeper'}
-      subtitle="Enter the shopkeeper's name, business name, phone number, and goods delivered date."
-      maxWidth="max-w-md"
+      title={initialData ? 'Edit Shopkeeper & Billing' : 'Add Shopkeeper & Goods Order'}
+      subtitle="Enter party details, billing category (With Bill / Without Bill), and goods delivery date."
+      maxWidth="max-w-lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Shopkeeper Name */}
-        <Input
-          label="Shopkeeper's Name"
-          placeholder="e.g. Rajesh Kumar"
-          value={formData.ownerName}
-          onChange={(e) => handleChange('ownerName', e.target.value)}
-          error={errors.ownerName}
-          required
-        />
+        {/* Shopkeeper Name & Business Name */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Input
+            label="Shopkeeper's Name"
+            placeholder="e.g. Rajesh Kumar"
+            value={formData.ownerName}
+            onChange={(e) => handleChange('ownerName', e.target.value)}
+            error={errors.ownerName}
+            required
+          />
 
-        {/* Business Name */}
-        <Input
-          label="Business / Shop Name"
-          placeholder="e.g. Rajesh Electricals"
-          value={formData.shopName}
-          onChange={(e) => handleChange('shopName', e.target.value)}
-          error={errors.shopName}
-          required
-        />
+          <Input
+            label="Business / Shop Name"
+            placeholder="e.g. Rajesh Electricals"
+            value={formData.shopName}
+            onChange={(e) => handleChange('shopName', e.target.value)}
+            error={errors.shopName}
+            required
+          />
+        </div>
 
         {/* Mobile Phone */}
         <Input
@@ -144,10 +172,103 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
           helperText="Used for 1-click Call & personalized WhatsApp reminders"
         />
 
+        {/* BILLING TYPE SELECTOR: With Bill vs Without Bill */}
+        <div className="space-y-2 pt-1">
+          <label className="block text-xs font-bold text-slate-200">
+            Goods Billing Category <span className="text-rose-400">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Option 1: With Bill */}
+            <button
+              type="button"
+              onClick={() => handleChange('billingType', 'with_bill')}
+              className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                formData.billingType === 'with_bill'
+                  ? 'bg-gradient-to-br from-indigo-950/80 to-brand-950/50 border-brand-400 text-white shadow-lg shadow-brand-500/15 ring-1 ring-brand-400'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <div className="flex items-center gap-2">
+                  <FileText className={`w-4 h-4 ${formData.billingType === 'with_bill' ? 'text-brand-400' : 'text-slate-500'}`} />
+                  <span className="text-xs font-bold">With Bill</span>
+                </div>
+                {formData.billingType === 'with_bill' && (
+                  <span className="w-4 h-4 rounded-full bg-brand-500 text-slate-950 flex items-center justify-center text-[10px] font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400">Official GST Tax Invoice</p>
+            </button>
+
+            {/* Option 2: Without Bill */}
+            <button
+              type="button"
+              onClick={() => handleChange('billingType', 'without_bill')}
+              className={`p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                formData.billingType === 'without_bill'
+                  ? 'bg-gradient-to-br from-amber-950/80 to-amber-900/30 border-amber-400 text-white shadow-lg shadow-amber-500/15 ring-1 ring-amber-400'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
+              }`}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <div className="flex items-center gap-2">
+                  <Package className={`w-4 h-4 ${formData.billingType === 'without_bill' ? 'text-amber-400' : 'text-slate-500'}`} />
+                  <span className="text-xs font-bold text-amber-300">Without Bill</span>
+                </div>
+                {formData.billingType === 'without_bill' && (
+                  <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center text-[10px] font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400">Challan / Slip / Estimate</p>
+            </button>
+          </div>
+        </div>
+
+        {/* CONDITIONAL NUMBER INPUT SECTION */}
+        <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800">
+          {formData.billingType === 'with_bill' ? (
+            <div className="space-y-1 animate-fadeIn">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-brand-300 mb-1">
+                <FileText className="w-3.5 h-3.5 text-brand-400" />
+                <span>With Bill — Tax Invoice Details</span>
+              </div>
+              <Input
+                label="Tax Invoice / Bill Number"
+                placeholder="e.g. INV-2024-001 or GST-8492"
+                value={formData.invoiceNumber}
+                onChange={(e) => handleChange('invoiceNumber', e.target.value)}
+                error={errors.invoiceNumber}
+                required
+                helperText="Official GST Tax Invoice number issued with these goods"
+              />
+            </div>
+          ) : (
+            <div className="space-y-1 animate-fadeIn">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300 mb-1">
+                <Package className="w-3.5 h-3.5 text-amber-400" />
+                <span>Without Bill — Challan / Slip Details</span>
+              </div>
+              <Input
+                label="Without Bill / Challan / Slip Number"
+                placeholder="e.g. CH-102 or SLIP-405 or WB-88"
+                value={formData.challanNumber}
+                onChange={(e) => handleChange('challanNumber', e.target.value)}
+                error={errors.challanNumber}
+                required
+                helperText="Delivery challan, estimate slip, or rough ledger reference number"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Bill Amount and Delivery Date */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Bill Amount */}
           <Input
-            label="Bill Amount (₹)"
+            label={formData.billingType === 'with_bill' ? 'Invoice Amount (₹)' : 'Order / Slip Amount (₹)'}
             type="number"
             min="0"
             placeholder="e.g. 25000"
@@ -155,7 +276,6 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
             onChange={(e) => handleChange('billAmount', e.target.value)}
           />
 
-          {/* Goods Delivered Date */}
           <Input
             label="Goods Delivered Date"
             type="date"
@@ -183,7 +303,7 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
             Cancel
           </Button>
           <Button type="submit" variant="primary" loading={submitting}>
-            {initialData ? 'Update Shopkeeper' : 'Add Shopkeeper'}
+            {initialData ? 'Update Account' : 'Save & Record Order'}
           </Button>
         </div>
       </form>

@@ -217,14 +217,26 @@ export function RecordPaymentModal({ isOpen, onClose, prefilledShopkeeperId = nu
           </div>
         </div>
 
-        {/* Invoice Number & Payment Date */}
+        {/* Document Number (Invoice vs Challan) & Payment Date */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
-            label="Invoice / Bill Number"
-            placeholder="e.g. INV-100234"
+            label={
+              (selectedShopkeeper?.billingType === 'without_bill' || !!selectedShopkeeper?.challanNumber)
+                ? 'Without Bill / Challan / Slip #'
+                : 'Tax Invoice / Bill Number'
+            }
+            placeholder={
+              (selectedShopkeeper?.billingType === 'without_bill' || !!selectedShopkeeper?.challanNumber)
+                ? 'e.g. CH-102 or SLIP-405'
+                : 'e.g. INV-100234'
+            }
             value={invoiceNumber}
             onChange={(e) => setInvoiceNumber(e.target.value)}
-            helperText="The invoice/bill against which this payment is given"
+            helperText={
+              (selectedShopkeeper?.billingType === 'without_bill' || !!selectedShopkeeper?.challanNumber)
+                ? 'Challan or slip number against which this payment is given'
+                : 'Official Tax Invoice against which this payment is given'
+            }
             required
           />
 
@@ -247,8 +259,11 @@ export function RecordPaymentModal({ isOpen, onClose, prefilledShopkeeperId = nu
 
             <p className="text-sm font-semibold text-white">
               <span className="text-emerald-400 font-extrabold">{formatINR(paymentNum)}</span> is being recorded on{' '}
-              <span className="text-brand-300 font-bold">{formatDate(paymentDate)}</span> against Invoice{' '}
-              <span className="font-mono text-amber-300 font-bold">#{invoiceNumber || 'INV-GENERAL'}</span>
+              <span className="text-brand-300 font-bold">{formatDate(paymentDate)}</span> against{' '}
+              {(selectedShopkeeper?.billingType === 'without_bill' || !!selectedShopkeeper?.challanNumber) ? 'Challan/Slip ' : 'Invoice '}
+              <span className="font-mono text-amber-300 font-bold">
+                #{invoiceNumber || ((selectedShopkeeper?.billingType === 'without_bill' || !!selectedShopkeeper?.challanNumber) ? 'CH-GENERAL' : 'INV-GENERAL')}
+              </span>
             </p>
 
             <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px] text-slate-400">

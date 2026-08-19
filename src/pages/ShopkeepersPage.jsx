@@ -26,29 +26,39 @@ export function ShopkeepersPage() {
   const counts = useMemo(() => {
     const withDue = shopkeepers.filter((s) => (Number(s.totalOutstanding) || 0) > 0).length;
     const clear = shopkeepers.filter((s) => (Number(s.totalOutstanding) || 0) === 0).length;
-    return { all: shopkeepers.length, withDue, clear };
+    const withBill = shopkeepers.filter((s) => s.billingType !== 'without_bill' && !s.challanNumber).length;
+    const withoutBill = shopkeepers.filter((s) => s.billingType === 'without_bill' || !!s.challanNumber).length;
+    return { all: shopkeepers.length, withDue, clear, withBill, withoutBill };
   }, [shopkeepers]);
 
   const totalOutstanding = shopkeepers.reduce((acc, sk) => acc + (Number(sk.totalOutstanding) || 0), 0);
 
   const filterPills = [
-    { id: 'all', label: 'All Shopkeepers', count: counts.all },
+    { id: 'all', label: 'All Accounts', count: counts.all },
+    { id: 'with_bill', label: '🧾 With Bill (GST)', count: counts.withBill },
+    { id: 'without_bill', label: '📦 Without Bill (Challan)', count: counts.withoutBill },
     { id: 'with_due', label: 'Pending Dues', count: counts.withDue },
-    { id: 'clear', label: 'Zero Due (Cleared)', count: counts.clear },
+    { id: 'clear', label: 'Zero Due', count: counts.clear },
   ];
 
   // Filtered shopkeepers list
   const filteredShopkeepers = useMemo(() => {
     return shopkeepers.filter((sk) => {
       const q = searchQuery.toLowerCase().trim();
+      const isWithoutBill = sk.billingType === 'without_bill' || !!sk.challanNumber;
+      const docNum = isWithoutBill ? (sk.challanNumber || sk.invoiceNumber || '') : (sk.invoiceNumber || '');
+
       const matchSearch =
         !q ||
         (sk.ownerName && sk.ownerName.toLowerCase().includes(q)) ||
         (sk.shopName && sk.shopName.toLowerCase().includes(q)) ||
-        (sk.phone && sk.phone.includes(q));
+        (sk.phone && sk.phone.includes(q)) ||
+        (docNum && docNum.toLowerCase().includes(q));
 
       if (!matchSearch) return false;
 
+      if (activeFilter === 'with_bill') return !isWithoutBill;
+      if (activeFilter === 'without_bill') return isWithoutBill;
       if (activeFilter === 'with_due') return (Number(sk.totalOutstanding) || 0) > 0;
       if (activeFilter === 'clear') return (Number(sk.totalOutstanding) || 0) === 0;
 
