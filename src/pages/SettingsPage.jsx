@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Building2, MessageSquare, Clock, Save, Smartphone, Download, Cloud, ShieldCheck } from 'lucide-react';
+import { Building2, MessageSquare, Clock, Save, Smartphone, Download, Cloud, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useBusiness } from '../context/BusinessContext';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -10,13 +10,39 @@ import { Badge } from '../components/common/Badge';
 
 export function SettingsPage() {
   const { businessProfile, updateBusinessProfile, reminderTemplates, updateReminderTemplates } = useBusiness();
-  const { isCloudConnected, currentUser } = useAuth();
+  const { isCloudConnected, currentUser, logout } = useAuth();
   const { isInstalled, isInstallable, promptInstall, isIOS, isOnline } = usePWA();
-  const { success } = useToast();
+  const { success, info } = useToast();
 
   const [profile, setProfile] = useState({ ...businessProfile });
   const [templates, setTemplates] = useState({ ...reminderTemplates });
   const [activeTemplateTab, setActiveTemplateTab] = useState('due_today');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleClearCacheAndReconnect = async () => {
+    setRefreshing(true);
+    info('Refreshing Connection', 'Clearing local session and reconnecting to Cloud Firebase...');
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (let registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        for (let name of cacheNames) {
+          await caches.delete(name);
+        }
+      }
+    } catch (err) {
+      console.warn('Cache clear error:', err);
+    }
+    localStorage.removeItem('electrotrack_session_user');
+    setTimeout(() => {
+      window.location.reload(true);
+    }, 600);
+  };
 
   const handleProfileChange = (field, value) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
@@ -91,17 +117,33 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div className="pt-1 space-y-2">
-          <p className="text-xs sm:text-sm font-semibold text-slate-200">
-            {isCloudConnected
-              ? 'Your account and data are synchronized across all devices in real-time.'
-              : 'App is running in browser local storage mode.'}
-          </p>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            {isCloudConnected
-              ? `Connected to Firebase project (electro-pay-bc98c). Any changes made on this PC or on your mobile device update automatically everywhere.`
-              : 'Data is only stored on this individual browser. Connect Firebase in .env to enable multi-device sync.'}
-          </p>
+        <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <p className="text-xs sm:text-sm font-semibold text-slate-200">
+              {isCloudConnected
+                ? 'Your account and data are synchronized across all devices in real-time.'
+                : 'App is running in browser local storage mode.'}
+            </p>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              {isCloudConnected
+                ? 'Connected to Firebase project (electro-pay-bc98c). Changes update automatically on all your devices.'
+                : 'Data is only stored on this individual device. Tap below to clear old local cache and connect to Cloud.'}
+            </p>
+          </div>
+
+          <div className="shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              loading={refreshing}
+              onClick={handleClearCacheAndReconnect}
+              className="w-full sm:w-auto text-xs font-bold border-slate-700 hover:border-brand-500 hover:text-brand-300 cursor-pointer"
+            >
+              Force Sync & Refresh Cloud
+            </Button>
+          </div>
         </div>
       </div>
 
