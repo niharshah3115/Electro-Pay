@@ -25,26 +25,23 @@ import {
   updateProfile
 } from 'firebase/auth';
 
-// Firebase configuration from environment variables
+// Firebase configuration from environment variables with production fallbacks
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || ''
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyD2_ZQ4RzjfiLAFdwSln3p0iAveVwRQoFA',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'electro-pay-bc98c.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'electro-pay-bc98c',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'electro-pay-bc98c.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '622092908847',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:622092908847:web:9820780204ee809c01c9da'
 };
 
-// Check if actual production Firebase credentials are provided in .env
+// Check if actual production Firebase credentials are provided
 export const isFirebaseConfigured = () => {
   const key = firebaseConfig.apiKey || '';
-  const proj = firebaseConfig.projectId || '';
   return !!(
     key &&
     !key.toLowerCase().includes('dummy') &&
     !key.toLowerCase().includes('your_firebase') &&
-    !proj.toLowerCase().includes('demo') &&
-    !proj.toLowerCase().includes('electrotrack-app') &&
     key.length > 25
   );
 };
