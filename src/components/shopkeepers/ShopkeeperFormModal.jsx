@@ -128,7 +128,6 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
         : formData.invoiceNumber.trim();
 
       const payload = {
-        id: matchedShopkeeper ? matchedShopkeeper.id : (initialData?.id || undefined),
         shopName: formData.shopName.trim(),
         ownerName: '',
         phone: formData.phone.trim(),
@@ -140,6 +139,10 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
         challanNumber: isWithoutBill ? formData.challanNumber.trim() : '',
       };
 
+      if (matchedShopkeeper?.id) {
+        payload.id = matchedShopkeeper.id;
+      }
+
       if (initialData?.id) {
         await updateShopkeeper(initialData.id, payload);
       } else {
@@ -148,6 +151,7 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
       onClose();
     } catch (err) {
       console.error('Error saving shopkeeper:', err);
+      setErrors({ form: err.message || 'Failed to save shopkeeper. Please try again.' });
     } finally {
       setSubmitting(false);
     }

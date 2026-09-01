@@ -287,14 +287,21 @@ export function BusinessProvider({ children }) {
   // SHOPKEEPER ACTIONS
   // ==========================================
   const addShopkeeper = async (data) => {
-    if (!currentUser?.uid) return;
+    const uid = currentUser?.uid || 'distributor_local';
+    const { id: passedId, ...rawCleanData } = data || {};
 
-    const cleanInputName = (data.shopName || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    const cleanPhone = (data.phone || '').trim().replace(/\D/g, '');
+    // Remove any undefined values
+    const cleanData = {};
+    Object.entries(rawCleanData).forEach(([k, v]) => {
+      if (v !== undefined) cleanData[k] = v;
+    });
+
+    const cleanInputName = (cleanData.shopName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const cleanPhone = (cleanData.phone || '').trim().replace(/\D/g, '');
 
     // Check if an existing shopkeeper already exists with matching id, name, or phone
     const existingSk = shopkeepers.find((s) => {
-      if (data.id && s.id === data.id) return true;
+      if (passedId && s.id === passedId) return true;
       const existingName = (s.shopName || '').trim().toLowerCase().replace(/\s+/g, ' ');
       const existingPhone = (s.phone || '').trim().replace(/\D/g, '');
       const matchName = cleanInputName && existingName === cleanInputName;
@@ -302,10 +309,10 @@ export function BusinessProvider({ children }) {
       return matchName || matchPhone;
     });
 
-    const creditDays = Number(data.creditDays) || businessProfile.defaultCreditDays || 39;
-    const newBill = Number(data.billAmount) || 0;
-    const deliveryDate = data.deliveryDate || getTodayString();
-    const dueDate = data.dueDate || calculateDueDate(deliveryDate, creditDays);
+    const creditDays = Number(cleanData.creditDays) || businessProfile.defaultCreditDays || 39;
+    const newBill = Number(cleanData.billAmount) || 0;
+    const deliveryDate = cleanData.deliveryDate || getTodayString();
+    const dueDate = cleanData.dueDate || calculateDueDate(deliveryDate, creditDays);
 
     if (existingSk) {
       // Repeat purchase on existing shopkeeper account: Do not create a new shopkeeper!
@@ -317,11 +324,11 @@ export function BusinessProvider({ children }) {
       const orderItem = {
         orderId: 'ord_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 4),
         amount: newBill,
-        billingType: data.billingType || existingSk.billingType || 'with_bill',
-        invoiceNumber: data.billingType === 'without_bill'
-          ? (data.challanNumber || `CH-${Date.now().toString().slice(-4)}`)
-          : (data.invoiceNumber || `INV-${Date.now().toString().slice(-4)}`),
-        challanNumber: data.billingType === 'without_bill' ? (data.challanNumber || '') : '',
+        billingType: cleanData.billingType || existingSk.billingType || 'with_bill',
+        invoiceNumber: cleanData.billingType === 'without_bill'
+          ? (cleanData.challanNumber || `CH-${Date.now().toString().slice(-4)}`)
+          : (cleanData.invoiceNumber || `INV-${Date.now().toString().slice(-4)}`),
+        challanNumber: cleanData.billingType === 'without_bill' ? (cleanData.challanNumber || '') : '',
         deliveryDate,
         dueDate,
         createdAt: new Date().toISOString(),
@@ -349,18 +356,27 @@ export function BusinessProvider({ children }) {
         billAmount: newTotalBilled,
         deliveryDate,
         dueDate,
-        billingType: data.billingType || existingSk.billingType,
+        billingType: cleanData.billingType || existingSk.billingType,
         invoiceNumber: orderItem.invoiceNumber,
         challanNumber: orderItem.challanNumber,
-        phone: data.phone?.trim() || existingSk.phone,
+        phone: cleanData.phone?.trim() || existingSk.phone || '',
         orders: updatedOrders,
       };
 
       if (isCloudConnected && db) {
-        await updateDoc(doc(db, 'shopkeepers', existingSk.id), {
-          ...updates,
-          updatedAt: serverTimestamp(),
-        });
+        try {
+          await updateDoc(doc(db, 'shopkeepers', existingSk.id), {
+            ...updates,
+            updatedAt: serverTimestamp(),
+          });
+        } catch (err) {
+          console.warn('Cloud update fallback:', err);
+          const nextShopkeepers = shopkeepers.map((s) =>
+            s.id === existingSk.id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
+          );
+          setShopkeepers(nextShopkeepers);
+          saveToLocalStore({ shopkeepers: nextShopkeepers });
+        }
       } else {
         const nextShopkeepers = shopkeepers.map((s) =>
           s.id === existingSk.id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
@@ -379,36 +395,58 @@ export function BusinessProvider({ children }) {
       const initialOrder = {
         orderId: 'ord_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 4),
         amount: newBill,
-        billingType: data.billingType || 'with_bill',
-        invoiceNumber: data.invoiceNumber || (data.billingType === 'without_bill' ? '' : `INV-${Date.now().toString().slice(-4)}`),
-        challanNumber: data.challanNumber || (data.billingType === 'without_bill' ? `CH-${Date.now().toString().slice(-4)}` : ''),
+        billingType: cleanData.billingType || 'with_bill',
+        invoiceNumber: cleanData.invoiceNumber || (cleanData.billingType === 'without_bill' ? '' : `INV-${Date.now().toString().slice(-4)}`),
+        challanNumber: cleanData.challanNumber || (cleanData.billingType === 'without_bill' ? `CH-${Date.now().toString().slice(-4)}` : ''),
         deliveryDate,
         dueDate,
         createdAt: new Date().toISOString(),
       };
 
       if (isCloudConnected && db) {
-        const skRef = doc(collection(db, 'shopkeepers'));
-        const skDoc = {
-          ...data,
-          distributorId: currentUser.uid,
-          deliveryDate,
-          dueDate,
-          billAmount: newBill,
-          totalOutstanding: newBill,
-          totalPaidAmount: 0,
-          creditDays,
-          orders: [initialOrder],
-          createdAt: serverTimestamp(),
-        };
-        await setDoc(skRef, skDoc);
-        success('Shopkeeper Added', `"${data.shopName}" registered with ₹${newBill.toLocaleString('en-IN')} bill amount.`);
-        return skRef.id;
+        try {
+          const skRef = doc(collection(db, 'shopkeepers'));
+          const skDoc = {
+            ...cleanData,
+            distributorId: uid,
+            deliveryDate,
+            dueDate,
+            billAmount: newBill,
+            totalOutstanding: newBill,
+            totalPaidAmount: 0,
+            creditDays,
+            orders: [initialOrder],
+            createdAt: serverTimestamp(),
+          };
+          await setDoc(skRef, skDoc);
+          success('Shopkeeper Added', `"${cleanData.shopName}" registered with ₹${newBill.toLocaleString('en-IN')} bill amount.`);
+          return skRef.id;
+        } catch (err) {
+          console.warn('Cloud save fallback to local:', err);
+          const newSkId = 'sk_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+          const newSk = {
+            ...cleanData,
+            id: newSkId,
+            deliveryDate,
+            dueDate,
+            billAmount: newBill,
+            totalOutstanding: newBill,
+            totalPaidAmount: 0,
+            creditDays,
+            orders: [initialOrder],
+            createdAt: new Date().toISOString(),
+          };
+          const nextShopkeepers = [...shopkeepers, newSk];
+          setShopkeepers(nextShopkeepers);
+          saveToLocalStore({ shopkeepers: nextShopkeepers });
+          success('Shopkeeper Added', `"${cleanData.shopName}" registered with ₹${newBill.toLocaleString('en-IN')} bill amount.`);
+          return newSkId;
+        }
       } else {
         const newSkId = 'sk_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
         const newSk = {
+          ...cleanData,
           id: newSkId,
-          ...data,
           deliveryDate,
           dueDate,
           billAmount: newBill,
@@ -423,21 +461,38 @@ export function BusinessProvider({ children }) {
         setShopkeepers(nextShopkeepers);
         saveToLocalStore({ shopkeepers: nextShopkeepers });
 
-        success('Shopkeeper Added', `"${data.shopName}" registered with ₹${newBill.toLocaleString('en-IN')} bill amount.`);
+        success('Shopkeeper Added', `"${cleanData.shopName}" registered with ₹${newBill.toLocaleString('en-IN')} bill amount.`);
         return newSkId;
       }
     }
   };
 
   const updateShopkeeper = async (id, updates) => {
+    if (!id) return;
+    const cleanUpdates = {};
+    Object.entries(updates || {}).forEach(([k, v]) => {
+      if (v !== undefined && k !== 'id') {
+        cleanUpdates[k] = v;
+      }
+    });
+
     if (isCloudConnected && db) {
-      await updateDoc(doc(db, 'shopkeepers', id), {
-        ...updates,
-        updatedAt: serverTimestamp(),
-      });
+      try {
+        await updateDoc(doc(db, 'shopkeepers', id), {
+          ...cleanUpdates,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Cloud update fallback:', err);
+        setShopkeepers((prev) => {
+          const next = prev.map((s) => (s.id === id ? { ...s, ...cleanUpdates } : s));
+          saveToLocalStore({ shopkeepers: next });
+          return next;
+        });
+      }
     } else {
       setShopkeepers((prev) => {
-        const next = prev.map((s) => (s.id === id ? { ...s, ...updates } : s));
+        const next = prev.map((s) => (s.id === id ? { ...s, ...cleanUpdates } : s));
         saveToLocalStore({ shopkeepers: next });
         return next;
       });
