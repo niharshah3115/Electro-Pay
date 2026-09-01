@@ -296,10 +296,7 @@ export function DashboardPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-extrabold text-white text-sm">
-                          {item.ownerName || 'Shopkeeper'}
-                        </span>
-                        <span className="text-xs font-bold text-brand-300">
-                          • {item.shopName}
+                          {item.shopName}
                         </span>
                         <Badge variant={badgeVariant} dot size="sm">
                           {badgeText}
@@ -412,8 +409,7 @@ export function DashboardPage() {
                   className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between text-xs hover:border-slate-700 transition-colors"
                 >
                   <div>
-                    <span className="font-bold text-white block">{p.ownerName || 'Shopkeeper'}</span>
-                    <span className="text-[11px] text-brand-300 font-medium">{p.shopkeeperName}</span>
+                    <span className="font-bold text-white block">{p.shopkeeperName || p.shopName || 'Shopkeeper'}</span>
                     <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
                       <span className="font-mono text-brand-300">#{p.receiptNumber}</span>
                       <span>•</span>

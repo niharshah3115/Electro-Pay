@@ -80,7 +80,7 @@ export function ShopkeepersPage() {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Directory showing shopkeeper name, business name, phone number, and ledger balances.
+            Directory showing business name, phone number, and ledger balances.
           </p>
         </div>
 
@@ -136,7 +136,7 @@ export function ShopkeepersPage() {
       <SearchFilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        placeholder="Search by shopkeeper name, business name, or mobile phone..."
+        placeholder="Search by business name or mobile phone..."
         filters={filterPills}
         activeFilter={activeFilter}
         onFilterChange={setActiveFilter}
@@ -150,7 +150,7 @@ export function ShopkeepersPage() {
           description={
             searchQuery
               ? `No accounts matched "${searchQuery}".`
-              : 'Add your first shopkeeper with their name, business name, and phone number.'
+              : 'Add your first shopkeeper with their business name and phone number.'
           }
           actionLabel={searchQuery ? 'Clear Search' : 'Add Shopkeeper'}
           onAction={() => {

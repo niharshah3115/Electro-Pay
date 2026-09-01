@@ -101,8 +101,7 @@ export function PaymentReceiptModal({ isOpen, onClose, payment }) {
             </div>
             <div>
               <span className="text-[10px] uppercase font-bold text-slate-400">Received From (Shopkeeper)</span>
-              <p className="font-bold text-white mt-0.5">{payment.ownerName || 'Shopkeeper'}</p>
-              <p className="text-brand-300 font-semibold text-[11px]">{payment.shopkeeperName}</p>
+              <p className="font-bold text-white mt-0.5">{payment.shopkeeperName || payment.shopName || 'Shopkeeper'}</p>
               <p className="text-slate-400 text-[11px] mt-0.5">Date: {formatDate(payment.paymentDate)}</p>
             </div>
           </div>

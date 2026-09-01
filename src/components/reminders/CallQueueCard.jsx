@@ -1,5 +1,5 @@
 import React from 'react';
-import { Phone, MessageSquare, AlertTriangle, Clock, Calendar, User, MapPin, Receipt, FileText, ArrowRight } from 'lucide-react';
+import { Phone, MessageSquare, AlertTriangle, Clock, Calendar, Store, MapPin, Receipt, FileText, ArrowRight } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { formatINR } from '../../utils/currencyUtils';
@@ -16,7 +16,6 @@ export function CallQueueCard({
   const {
     shopkeeper,
     shopName,
-    ownerName,
     phone,
     invoiceNumber,
     outstandingAmount,
@@ -76,28 +75,18 @@ export function CallQueueCard({
 
   return (
     <div className={`rounded-2xl border p-5 shadow-xl transition-all duration-200 ${cardBorder} space-y-4`}>
-      {/* Header Info: Shopkeeper Name & Business Name */}
+      {/* Header Info: Business Name */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Store className="w-4 h-4 text-brand-400" />
             <span className="text-base font-black text-white tracking-tight">
-              {ownerName || 'Shopkeeper'}
-            </span>
-            <span className="text-sm font-bold text-brand-300">
-              • {shopName}
+              {shopName}
             </span>
             {priorityBadge}
           </div>
 
           <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 flex-wrap">
-            <span className="text-slate-300">
-              Shopkeeper: <strong className="text-white">{ownerName || 'Proprietor'}</strong>
-            </span>
-            <span>•</span>
-            <span className="text-slate-300">
-              Business: <strong className="text-white">{shopName}</strong>
-            </span>
-            <span>•</span>
             <span className="flex items-center gap-1 font-mono text-slate-300">
               <Phone className="w-3 h-3 text-brand-400" />
               {phone}

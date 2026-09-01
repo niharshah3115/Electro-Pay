@@ -54,7 +54,7 @@ export function LogCallModal({ isOpen, onClose, shopkeeper }) {
       isOpen={isOpen}
       onClose={onClose}
       title={`Log Call Outcome: ${shopkeeper.shopName}`}
-      subtitle={`Contact: ${shopkeeper.ownerName || 'Proprietor'} (${shopkeeper.phone}) • Balance: ${formatINR(
+      subtitle={`Phone: ${shopkeeper.phone} • Balance: ${formatINR(
         shopkeeper.totalOutstanding || 0
       )}`}
       maxWidth="max-w-lg"

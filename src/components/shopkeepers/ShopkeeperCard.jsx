@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Phone, MessageSquare, Receipt, User, Store, Trash2, Edit2, CheckCircle2, Calendar, FileText, Package } from 'lucide-react';
+import { Phone, MessageSquare, Receipt, Store, Trash2, Edit2, CheckCircle2, Calendar, FileText, Package } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -50,22 +50,16 @@ export function ShopkeeperCard({
   return (
     <>
       <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl hover:border-slate-700 transition-all flex flex-col justify-between space-y-4">
-        {/* Top Header: Shopkeeper Name & Business Name */}
+        {/* Top Header: Business Name */}
         <div className="space-y-2.5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              {/* Shopkeeper Name */}
-              <div className="flex items-center gap-1.5">
-                <User className="w-4 h-4 text-brand-400 shrink-0" />
-                <h3 className="text-base font-black text-white tracking-tight">
-                  {shopkeeper.ownerName || 'Shopkeeper'}
-                </h3>
-              </div>
-
               {/* Business Name */}
-              <div className="flex items-center gap-1.5 text-xs text-brand-300 font-bold mt-0.5">
-                <Store className="w-3.5 h-3.5 text-brand-400 shrink-0" />
-                <span>{shopkeeper.shopName}</span>
+              <div className="flex items-center gap-2">
+                <Store className="w-4 h-4 text-brand-400 shrink-0" />
+                <h3 className="text-base font-black text-white tracking-tight">
+                  {shopkeeper.shopName}
+                </h3>
               </div>
             </div>
 
@@ -199,7 +193,7 @@ export function ShopkeeperCard({
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleDeleteConfirm}
         title="Delete Shopkeeper?"
-        message={`Are you sure you want to delete "${shopkeeper.ownerName} (${shopkeeper.shopName})"? This will remove their ledger records.`}
+        message={`Are you sure you want to delete "${shopkeeper.shopName}"? This will remove their ledger records.`}
         confirmText="Delete"
         confirmVariant="danger"
         loading={isDeleting}

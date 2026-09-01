@@ -182,8 +182,7 @@ export function PaymentsPage() {
                       {payment.receiptNumber || 'REC'}
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="font-bold text-white text-xs">{payment.ownerName || 'Shopkeeper'}</div>
-                      <div className="text-[11px] text-brand-300 font-medium">{payment.shopkeeperName}</div>
+                      <div className="font-bold text-white text-xs">{payment.shopkeeperName || payment.shopName || 'Shopkeeper'}</div>
                     </td>
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className="font-mono font-bold text-brand-300 px-2 py-0.5 rounded bg-brand-500/10 border border-brand-500/20 text-[11px]">

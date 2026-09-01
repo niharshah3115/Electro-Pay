@@ -16,9 +16,100 @@ import {
   serverTimestamp,
   writeBatch,
 } from '../services/firebase';
-import { getTodayString } from '../utils/dateUtils';
+import { getTodayString, calculateDueDate } from '../utils/dateUtils';
 import { DEFAULT_CREDIT_DAYS } from '../constants/creditConfig';
 import { DEFAULT_WHATSAPP_TEMPLATES } from '../constants/defaultTemplates';
+
+/**
+ * Consolidates duplicate shopkeeper records by normalized shopName or phone number.
+ */
+export function consolidateShopkeepers(rawShopkeepers, rawPayments = []) {
+  if (!Array.isArray(rawShopkeepers) || rawShopkeepers.length === 0) {
+    return { shopkeepers: [], payments: rawPayments };
+  }
+
+  const idMap = new Map(); // oldId -> canonicalId
+  const groups = new Map(); // canonicalKey -> mergedSk
+
+  for (const sk of rawShopkeepers) {
+    if (!sk) continue;
+    const normName = (sk.shopName || sk.name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const cleanPhone = (sk.phone || '').trim().replace(/\D/g, '');
+    
+    // Canonical key: prefer normalized name, then phone (if valid), else unique id
+    const key = normName || (cleanPhone.length >= 8 ? cleanPhone.slice(-10) : sk.id);
+
+    if (groups.has(key)) {
+      const existing = groups.get(key);
+      idMap.set(sk.id, existing.id);
+
+      const addedOutstanding = Number(sk.totalOutstanding) || 0;
+      const addedPaid = Number(sk.totalPaidAmount) || 0;
+      const addedBilled = Number(sk.billAmount) || (addedOutstanding + addedPaid);
+
+      const existingOrders = Array.isArray(existing.orders) ? existing.orders : [];
+      const skOrders = Array.isArray(sk.orders) ? sk.orders : (
+        addedBilled > 0
+          ? [{
+              orderId: 'ord_' + (sk.id || Date.now().toString(36)),
+              amount: addedBilled,
+              billingType: sk.billingType || 'with_bill',
+              invoiceNumber: sk.invoiceNumber || 'INV-GENERAL',
+              challanNumber: sk.challanNumber || '',
+              deliveryDate: sk.deliveryDate || sk.invoiceDate || sk.createdAt || getTodayString(),
+              dueDate: sk.dueDate || '',
+              createdAt: sk.createdAt || new Date().toISOString(),
+            }]
+          : []
+      );
+
+      groups.set(key, {
+        ...existing,
+        totalOutstanding: (Number(existing.totalOutstanding) || 0) + addedOutstanding,
+        totalPaidAmount: (Number(existing.totalPaidAmount) || 0) + addedPaid,
+        billAmount: (Number(existing.billAmount) || 0) + addedBilled,
+        phone: existing.phone || sk.phone,
+        deliveryDate: sk.deliveryDate || existing.deliveryDate,
+        dueDate: sk.dueDate || existing.dueDate,
+        orders: [...skOrders, ...existingOrders],
+      });
+    } else {
+      const initialOrders = Array.isArray(sk.orders) ? sk.orders : (
+        (sk.billAmount || sk.totalOutstanding)
+          ? [{
+              orderId: 'ord_' + (sk.id || Date.now().toString(36)),
+              amount: Number(sk.billAmount || sk.totalOutstanding) || 0,
+              billingType: sk.billingType || 'with_bill',
+              invoiceNumber: sk.invoiceNumber || 'INV-GENERAL',
+              challanNumber: sk.challanNumber || '',
+              deliveryDate: sk.deliveryDate || sk.invoiceDate || sk.createdAt || getTodayString(),
+              dueDate: sk.dueDate || '',
+              createdAt: sk.createdAt || new Date().toISOString(),
+            }]
+          : []
+      );
+
+      const canonicalSk = {
+        ...sk,
+        orders: initialOrders,
+      };
+      groups.set(key, canonicalSk);
+      idMap.set(sk.id, sk.id);
+    }
+  }
+
+  const mergedShopkeepers = Array.from(groups.values());
+  mergedShopkeepers.sort((a, b) => (a.shopName || '').localeCompare(b.shopName || ''));
+
+  const updatedPayments = (rawPayments || []).map((p) => {
+    if (p.shopkeeperId && idMap.has(p.shopkeeperId)) {
+      return { ...p, shopkeeperId: idMap.get(p.shopkeeperId) };
+    }
+    return p;
+  });
+
+  return { shopkeepers: mergedShopkeepers, payments: updatedPayments };
+}
 
 const BusinessContext = createContext(null);
 
@@ -105,9 +196,9 @@ export function BusinessProvider({ children }) {
         // Shopkeepers
         const skQuery = query(collection(db, 'shopkeepers'), where('distributorId', '==', uid));
         const unsubSk = onSnapshot(skQuery, (snap) => {
-          const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          list.sort((a, b) => (a.shopName || '').localeCompare(b.shopName || ''));
-          setShopkeepers(list);
+          const rawList = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          const { shopkeepers: cleanShopkeepers } = consolidateShopkeepers(rawList);
+          setShopkeepers(cleanShopkeepers);
         });
         unsubscribers.push(unsubSk);
 
@@ -144,8 +235,13 @@ export function BusinessProvider({ children }) {
         const raw = localStorage.getItem(storageKey);
         if (raw) {
           const parsed = JSON.parse(raw);
-          setShopkeepers(parsed.shopkeepers || []);
-          setPayments(parsed.payments || []);
+          const { shopkeepers: cleanShopkeepers, payments: cleanPayments } = consolidateShopkeepers(
+            parsed.shopkeepers || [],
+            parsed.payments || []
+          );
+
+          setShopkeepers(cleanShopkeepers);
+          setPayments(cleanPayments);
           setCallLogs(parsed.callLogs || []);
           setBusinessProfile(
             parsed.businessProfile || {
@@ -155,6 +251,11 @@ export function BusinessProvider({ children }) {
             }
           );
           setReminderTemplates(parsed.reminderTemplates || DEFAULT_WHATSAPP_TEMPLATES);
+
+          // Auto-persist cleaned consolidated data if duplicates existed
+          if (cleanShopkeepers.length !== (parsed.shopkeepers || []).length) {
+            saveToLocalStore({ shopkeepers: cleanShopkeepers, payments: cleanPayments });
+          }
         } else {
           const emptyState = {
             shopkeepers: [],
@@ -180,7 +281,7 @@ export function BusinessProvider({ children }) {
         setLoading(false);
       }
     }
-  }, [isAuthenticated, currentUser?.uid, currentUser?.email, currentUser?.displayName, isCloudConnected, storageKey]);
+  }, [isAuthenticated, currentUser?.uid, currentUser?.email, currentUser?.displayName, isCloudConnected, storageKey, saveToLocalStore]);
 
   // ==========================================
   // SHOPKEEPER ACTIONS
@@ -188,47 +289,143 @@ export function BusinessProvider({ children }) {
   const addShopkeeper = async (data) => {
     if (!currentUser?.uid) return;
 
+    const cleanInputName = (data.shopName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const cleanPhone = (data.phone || '').trim().replace(/\D/g, '');
+
+    // Check if an existing shopkeeper already exists with matching id, name, or phone
+    const existingSk = shopkeepers.find((s) => {
+      if (data.id && s.id === data.id) return true;
+      const existingName = (s.shopName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const existingPhone = (s.phone || '').trim().replace(/\D/g, '');
+      const matchName = cleanInputName && existingName === cleanInputName;
+      const matchPhone = cleanPhone.length >= 8 && existingPhone.length >= 8 && cleanPhone.slice(-10) === existingPhone.slice(-10);
+      return matchName || matchPhone;
+    });
+
     const creditDays = Number(data.creditDays) || businessProfile.defaultCreditDays || 39;
-    const initialBill = Number(data.billAmount) || 0;
+    const newBill = Number(data.billAmount) || 0;
     const deliveryDate = data.deliveryDate || getTodayString();
     const dueDate = data.dueDate || calculateDueDate(deliveryDate, creditDays);
 
-    if (isCloudConnected && db) {
-      const skRef = doc(collection(db, 'shopkeepers'));
-      const skDoc = {
-        ...data,
-        distributorId: currentUser.uid,
+    if (existingSk) {
+      // Repeat purchase on existing shopkeeper account: Do not create a new shopkeeper!
+      const currentOutstanding = Number(existingSk.totalOutstanding) || 0;
+      const currentTotalBilled = Number(existingSk.billAmount) || currentOutstanding;
+      const newOutstanding = currentOutstanding + newBill;
+      const newTotalBilled = currentTotalBilled + newBill;
+
+      const orderItem = {
+        orderId: 'ord_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 4),
+        amount: newBill,
+        billingType: data.billingType || existingSk.billingType || 'with_bill',
+        invoiceNumber: data.billingType === 'without_bill'
+          ? (data.challanNumber || `CH-${Date.now().toString().slice(-4)}`)
+          : (data.invoiceNumber || `INV-${Date.now().toString().slice(-4)}`),
+        challanNumber: data.billingType === 'without_bill' ? (data.challanNumber || '') : '',
         deliveryDate,
         dueDate,
-        billAmount: initialBill,
-        totalOutstanding: initialBill,
-        totalPaidAmount: 0,
-        creditDays,
-        createdAt: serverTimestamp(),
-      };
-      await setDoc(skRef, skDoc);
-      success('Shopkeeper Added', `"${data.shopName}" registered with ₹${initialBill.toLocaleString('en-IN')} bill amount.`);
-      return skRef.id;
-    } else {
-      const newSkId = 'sk_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
-      const newSk = {
-        id: newSkId,
-        ...data,
-        deliveryDate,
-        dueDate,
-        billAmount: initialBill,
-        totalOutstanding: initialBill,
-        totalPaidAmount: 0,
-        creditDays,
         createdAt: new Date().toISOString(),
       };
 
-      const nextShopkeepers = [...shopkeepers, newSk];
-      setShopkeepers(nextShopkeepers);
-      saveToLocalStore({ shopkeepers: nextShopkeepers });
+      const existingOrders = Array.isArray(existingSk.orders) ? existingSk.orders : (
+        (existingSk.billAmount || existingSk.totalOutstanding)
+          ? [{
+              orderId: 'ord_init_' + (existingSk.id || '1'),
+              amount: Number(existingSk.billAmount || existingSk.totalOutstanding) || 0,
+              billingType: existingSk.billingType || 'with_bill',
+              invoiceNumber: existingSk.invoiceNumber || 'INV-1001',
+              challanNumber: existingSk.challanNumber || '',
+              deliveryDate: existingSk.deliveryDate || existingSk.invoiceDate || getTodayString(),
+              dueDate: existingSk.dueDate || getTodayString(),
+              createdAt: existingSk.createdAt || new Date().toISOString(),
+            }]
+          : []
+      );
 
-      success('Shopkeeper Added', `"${data.shopName}" registered with ₹${initialBill.toLocaleString('en-IN')} bill amount.`);
-      return newSkId;
+      const updatedOrders = [orderItem, ...existingOrders];
+
+      const updates = {
+        totalOutstanding: newOutstanding,
+        billAmount: newTotalBilled,
+        deliveryDate,
+        dueDate,
+        billingType: data.billingType || existingSk.billingType,
+        invoiceNumber: orderItem.invoiceNumber,
+        challanNumber: orderItem.challanNumber,
+        phone: data.phone?.trim() || existingSk.phone,
+        orders: updatedOrders,
+      };
+
+      if (isCloudConnected && db) {
+        await updateDoc(doc(db, 'shopkeepers', existingSk.id), {
+          ...updates,
+          updatedAt: serverTimestamp(),
+        });
+      } else {
+        const nextShopkeepers = shopkeepers.map((s) =>
+          s.id === existingSk.id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
+        );
+        setShopkeepers(nextShopkeepers);
+        saveToLocalStore({ shopkeepers: nextShopkeepers });
+      }
+
+      success(
+        'Repeat Purchase Added',
+        `Added ₹${newBill.toLocaleString('en-IN')} order to "${existingSk.shopName}". Total outstanding is now ₹${newOutstanding.toLocaleString('en-IN')}.`
+      );
+      return existingSk.id;
+    } else {
+      // New Shopkeeper Registration: Adds exactly one new shopkeeper!
+      const initialOrder = {
+        orderId: 'ord_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 4),
+        amount: newBill,
+        billingType: data.billingType || 'with_bill',
+        invoiceNumber: data.invoiceNumber || (data.billingType === 'without_bill' ? '' : `INV-${Date.now().toString().slice(-4)}`),
+        challanNumber: data.challanNumber || (data.billingType === 'without_bill' ? `CH-${Date.now().toString().slice(-4)}` : ''),
+        deliveryDate,
+        dueDate,
+        createdAt: new Date().toISOString(),
+      };
+
+      if (isCloudConnected && db) {
+        const skRef = doc(collection(db, 'shopkeepers'));
+        const skDoc = {
+          ...data,
+          distributorId: currentUser.uid,
+          deliveryDate,
+          dueDate,
+          billAmount: newBill,
+          totalOutstanding: newBill,
+          totalPaidAmount: 0,
+          creditDays,
+          orders: [initialOrder],
+          createdAt: serverTimestamp(),
+        };
+        await setDoc(skRef, skDoc);
+        success('Shopkeeper Added', `"${data.shopName}" registered with ₹${newBill.toLocaleString('en-IN')} bill amount.`);
+        return skRef.id;
+      } else {
+        const newSkId = 'sk_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+        const newSk = {
+          id: newSkId,
+          ...data,
+          deliveryDate,
+          dueDate,
+          billAmount: newBill,
+          totalOutstanding: newBill,
+          totalPaidAmount: 0,
+          creditDays,
+          orders: [initialOrder],
+          createdAt: new Date().toISOString(),
+        };
+
+        const nextShopkeepers = [...shopkeepers, newSk];
+        setShopkeepers(nextShopkeepers);
+        saveToLocalStore({ shopkeepers: nextShopkeepers });
+
+        success('Shopkeeper Added', `"${data.shopName}" registered with ₹${newBill.toLocaleString('en-IN')} bill amount.`);
+        return newSkId;
+      }
     }
   };
 

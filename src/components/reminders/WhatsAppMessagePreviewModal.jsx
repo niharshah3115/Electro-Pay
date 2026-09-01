@@ -25,7 +25,7 @@ export function WhatsAppMessagePreviewModal({ isOpen, onClose, data }) {
         const totalBilled = (Number(shopkeeper.totalOutstanding) || 0) + (Number(shopkeeper.totalPaidAmount) || 0) || Number(shopkeeper.billAmount) || 0;
         const compiled = compileTemplate(template.text, {
           shopName: shopkeeper.shopName,
-          ownerName: shopkeeper.ownerName || shopkeeper.shopName || 'Sir',
+          ownerName: shopkeeper.shopName || 'Customer',
           invoiceNumber: shopkeeper.invoiceNumber || `INV-${shopkeeper.id ? shopkeeper.id.slice(-4) : '1025'}`,
           totalOverdue: shopkeeper.totalOutstanding,
           dueAmount: shopkeeper.totalOutstanding,
@@ -60,7 +60,7 @@ export function WhatsAppMessagePreviewModal({ isOpen, onClose, data }) {
       const totalBilled = (Number(shopkeeper.totalOutstanding) || 0) + (Number(shopkeeper.totalPaidAmount) || 0) || Number(shopkeeper.billAmount) || 0;
       const compiled = compileTemplate(template.text, {
         shopName: shopkeeper.shopName,
-        ownerName: shopkeeper.ownerName || shopkeeper.shopName || 'Sir',
+        ownerName: shopkeeper.shopName || 'Customer',
         invoiceNumber: invoiceNumber,
         totalOverdue: totalOutstanding,
         dueAmount: totalOutstanding,
@@ -104,7 +104,7 @@ export function WhatsAppMessagePreviewModal({ isOpen, onClose, data }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Personalized WhatsApp Payment Reminder"
-      subtitle={`Shopkeeper: ${shopkeeper.ownerName || 'Customer'} • Business: ${shopkeeper.shopName}`}
+      subtitle={`Business: ${shopkeeper.shopName}`}
       maxWidth="max-w-xl"
     >
       <div className="space-y-4">

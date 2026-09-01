@@ -155,7 +155,7 @@ export function InvoiceFormModal({ isOpen, onClose, prefilledShopkeeperId = null
               <option value="">-- Choose Shopkeeper --</option>
               {shopkeepers.map((sk) => (
                 <option key={sk.id} value={sk.id}>
-                  {sk.shopName} ({sk.ownerName || 'Proprietor'}) - Due: ₹{(sk.totalOutstanding || 0).toLocaleString('en-IN')}
+                  {sk.shopName} - Due: ₹{(sk.totalOutstanding || 0).toLocaleString('en-IN')}
                 </option>
               ))}
             </Select>

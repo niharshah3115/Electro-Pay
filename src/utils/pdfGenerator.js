@@ -57,7 +57,7 @@ export function generateShopkeeperStatementPDF({
   doc.setFont('helvetica', 'bold');
   doc.text(`Customer: ${shopkeeper.shopName}`, 20, 63);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Proprietor: ${shopkeeper.ownerName || 'N/A'} | Billing: ${docRefText}`, 20, 71);
+  doc.text(`Billing: ${docRefText}`, 20, 71);
   doc.text(`Phone: ${shopkeeper.phone} | Goods Delivered: ${formatDate(shopkeeper.deliveryDate || shopkeeper.invoiceDate || shopkeeper.createdAt)}`, 20, 79);
 
   doc.setFont('helvetica', 'bold');

@@ -162,7 +162,7 @@ export function RecordPaymentModal({ isOpen, onClose, prefilledShopkeeperId = nu
             <option value="">-- Choose Account --</option>
             {shopkeepers.map((sk) => (
               <option key={sk.id} value={sk.id}>
-                {sk.ownerName ? `${sk.ownerName} (${sk.shopName})` : sk.shopName} — Due: ₹{Number(sk.totalOutstanding || 0).toLocaleString('en-IN')}
+                {sk.shopName} — Due: ₹{Number(sk.totalOutstanding || 0).toLocaleString('en-IN')}
               </option>
             ))}
           </Select>

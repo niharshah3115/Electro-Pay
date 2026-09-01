@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Store, Phone, DollarSign, Calendar, FileText, Package, Check, Hash } from 'lucide-react';
+import { Store, Phone, DollarSign, Calendar, FileText, Package, Check, Hash } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { Input } from '../common/Input';
 import { Button } from '../common/Button';
@@ -7,10 +7,9 @@ import { useBusiness } from '../../context/BusinessContext';
 import { getTodayString, calculateDueDate, formatDate } from '../../utils/dateUtils';
 
 export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
-  const { addShopkeeper, updateShopkeeper } = useBusiness();
+  const { shopkeepers = [], addShopkeeper, updateShopkeeper } = useBusiness();
 
   const [formData, setFormData] = useState({
-    ownerName: '',
     shopName: '',
     phone: '',
     billAmount: '',
@@ -23,11 +22,24 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
+  // Detect matching existing shopkeeper
+  const normInputName = (formData.shopName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const cleanInputPhone = (formData.phone || '').trim().replace(/\D/g, '');
+
+  const matchedShopkeeper = !initialData && (normInputName || cleanInputPhone.length >= 8)
+    ? shopkeepers.find((s) => {
+        const normS = (s.shopName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const cleanSPhone = (s.phone || '').trim().replace(/\D/g, '');
+        const matchName = normInputName && normS === normInputName;
+        const matchPhone = cleanInputPhone.length >= 8 && cleanSPhone.length >= 8 && cleanInputPhone.slice(-10) === cleanSPhone.slice(-10);
+        return matchName || matchPhone;
+      })
+    : null;
+
   useEffect(() => {
     if (initialData) {
       const isWithoutBill = initialData.billingType === 'without_bill' || !!initialData.challanNumber;
       setFormData({
-        ownerName: initialData.ownerName || '',
         shopName: initialData.shopName || '',
         phone: initialData.phone || '',
         billAmount: String(initialData.billAmount || initialData.totalOutstanding || ''),
@@ -38,7 +50,6 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
       });
     } else {
       setFormData({
-        ownerName: '',
         shopName: '',
         phone: '',
         billAmount: '',
@@ -52,7 +63,20 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
   }, [initialData, isOpen]);
 
   const handleChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      // Auto-fill phone when typing/selecting existing shopkeeper
+      if (field === 'shopName' && !initialData && (!prev.phone || prev.phone.trim() === '')) {
+        const normVal = value.trim().toLowerCase().replace(/\s+/g, ' ');
+        const found = shopkeepers.find(
+          (s) => (s.shopName || '').trim().toLowerCase().replace(/\s+/g, ' ') === normVal
+        );
+        if (found?.phone) {
+          next.phone = found.phone;
+        }
+      }
+      return next;
+    });
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: null }));
     }
@@ -64,9 +88,6 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
     e.preventDefault();
     const newErrors = {};
 
-    if (!formData.ownerName.trim()) {
-      newErrors.ownerName = "Shopkeeper's name is required";
-    }
     if (!formData.shopName.trim()) {
       newErrors.shopName = 'Business / Shop name is required';
     }
@@ -107,8 +128,9 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
         : formData.invoiceNumber.trim();
 
       const payload = {
-        ownerName: formData.ownerName.trim(),
+        id: matchedShopkeeper ? matchedShopkeeper.id : (initialData?.id || undefined),
         shopName: formData.shopName.trim(),
+        ownerName: '',
         phone: formData.phone.trim(),
         billAmount: numBillAmount,
         deliveryDate: formData.deliveryDate,
@@ -118,7 +140,7 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
         challanNumber: isWithoutBill ? formData.challanNumber.trim() : '',
       };
 
-      if (initialData) {
+      if (initialData?.id) {
         await updateShopkeeper(initialData.id, payload);
       } else {
         await addShopkeeper(payload);
@@ -135,30 +157,56 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={initialData ? 'Edit Shopkeeper & Billing' : 'Add Shopkeeper & Goods Order'}
-      subtitle="Enter party details, billing category (With Bill / Without Bill), and goods delivery date."
+      title={
+        initialData
+          ? 'Edit Shopkeeper & Billing'
+          : matchedShopkeeper
+          ? `Add Order: ${matchedShopkeeper.shopName}`
+          : 'Add Shopkeeper & Goods Order'
+      }
+      subtitle={
+        matchedShopkeeper
+          ? `Existing account detected. Adding this order will increase account balance without creating a duplicate account.`
+          : 'Enter party details, billing category (With Bill / Without Bill), and goods delivery date.'
+      }
       maxWidth="max-w-lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Shopkeeper Name & Business Name */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Input
-            label="Shopkeeper's Name"
-            placeholder="e.g. Rajesh Kumar"
-            value={formData.ownerName}
-            onChange={(e) => handleChange('ownerName', e.target.value)}
-            error={errors.ownerName}
-            required
-          />
+        {/* Existing Shopkeeper Detected Banner */}
+        {matchedShopkeeper && !initialData && (
+          <div className="p-3.5 rounded-2xl bg-brand-500/10 border border-brand-500/30 text-xs text-brand-200 space-y-1.5 animate-fadeIn">
+            <div className="flex items-center justify-between font-bold text-brand-300">
+              <span className="flex items-center gap-1.5">
+                <Store className="w-4 h-4 text-brand-400" />
+                Existing Account: {matchedShopkeeper.shopName}
+              </span>
+              <span className="font-sans text-amber-400 font-extrabold">
+                Current Due: ₹{(Number(matchedShopkeeper.totalOutstanding) || 0).toLocaleString('en-IN')}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Repeat purchase detected. Submitting will add this <strong>₹{Number(formData.billAmount || 0).toLocaleString('en-IN')}</strong> order to their ledger (New Due: <strong className="text-amber-300">₹{((Number(matchedShopkeeper.totalOutstanding) || 0) + Number(formData.billAmount || 0)).toLocaleString('en-IN')}</strong>).
+            </p>
+          </div>
+        )}
 
+        {/* Business / Shop Name with Datalist Autocomplete */}
+        <div>
           <Input
             label="Business / Shop Name"
             placeholder="e.g. Rajesh Electricals"
             value={formData.shopName}
             onChange={(e) => handleChange('shopName', e.target.value)}
             error={errors.shopName}
+            list="existing-shopkeeper-suggestions"
+            autoComplete="off"
             required
           />
+          <datalist id="existing-shopkeeper-suggestions">
+            {shopkeepers.map((sk) => (
+              <option key={sk.id} value={sk.shopName} />
+            ))}
+          </datalist>
         </div>
 
         {/* Mobile Phone */}
@@ -303,7 +351,11 @@ export function ShopkeeperFormModal({ isOpen, onClose, initialData = null }) {
             Cancel
           </Button>
           <Button type="submit" variant="primary" loading={submitting}>
-            {initialData ? 'Update Account' : 'Save & Record Order'}
+            {initialData
+              ? 'Update Account'
+              : matchedShopkeeper
+              ? 'Add Order to Account'
+              : 'Save & Register Shopkeeper'}
           </Button>
         </div>
       </form>

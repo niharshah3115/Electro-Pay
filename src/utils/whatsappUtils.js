@@ -35,7 +35,7 @@ export function generateTelUrl(phone) {
  * Thank you.
  */
 export function generatePersonalizedReminderMessage(shopkeeper, timing = {}) {
-  const ownerName = shopkeeper.ownerName || shopkeeper.shopName || 'Customer';
+  const customerName = shopkeeper.shopName || shopkeeper.ownerName || 'Customer';
   const dueAmount = Number(shopkeeper.totalOutstanding) || 0;
   const isWithoutBill = shopkeeper.billingType === 'without_bill' || !!shopkeeper.challanNumber;
   const docTypeLabel = isWithoutBill ? 'Challan/Slip' : 'Invoice';
@@ -52,7 +52,7 @@ export function generatePersonalizedReminderMessage(shopkeeper, timing = {}) {
     dueStatusText = 'is due today';
   }
 
-  return `Hello ${ownerName},
+  return `Hello ${customerName},
 
 Your payment of ₹${dueAmount.toLocaleString('en-IN')} for ${docTypeLabel} ${docNumber} ${dueStatusText}.
 
@@ -77,7 +77,7 @@ export function compileTemplate(templateText, data = {}) {
   let compiled = templateText;
   const replacements = {
     '{shop_name}': data.shopName || 'Shop',
-    '{owner_name}': data.ownerName || 'Customer',
+    '{owner_name}': data.ownerName || data.shopName || 'Customer',
     '{invoice_number}': data.invoiceNumber || data.invoiceNumbers || 'N/A',
     '{invoice_numbers}': data.invoiceNumbers || data.invoiceNumber || 'N/A',
     '{total_overdue}': due.toLocaleString('en-IN'),

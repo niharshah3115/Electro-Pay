@@ -9,11 +9,13 @@ import {
   Edit,
   Trash2,
   MapPin,
-  User,
   Clock,
   PhoneCall,
   Package,
   Truck,
+  Plus,
+  FileText,
+  ShoppingBag,
 } from 'lucide-react';
 import { useBusiness } from '../context/BusinessContext';
 import { Button } from '../components/common/Button';
@@ -22,7 +24,7 @@ import { PaymentReceiptModal } from '../components/payments/PaymentReceiptModal'
 import { ShopkeeperFormModal } from '../components/shopkeepers/ShopkeeperFormModal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { formatINR } from '../utils/currencyUtils';
-import { formatDate, formatDateTime } from '../utils/dateUtils';
+import { formatDate, formatDateTime, getTodayString } from '../utils/dateUtils';
 import { generateTelUrl } from '../utils/whatsappUtils';
 import { generateShopkeeperStatementPDF } from '../utils/pdfGenerator';
 import { CALL_OUTCOMES } from '../constants/callOutcomes';
@@ -37,15 +39,36 @@ export function ShopkeeperDetailPage() {
     onOpenWhatsApp = () => {},
   } = useOutletContext() || {};
 
-  const [activeTab, setActiveTab] = useState('payments'); // 'payments' | 'calls'
+  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'payments' | 'calls'
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [paymentToDelete, setPaymentToDelete] = useState(null);
   const [isDeletingPayment, setIsDeletingPayment] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeletingShopkeeper, setIsDeletingShopkeeper] = useState(false);
 
   const shopkeeper = shopkeepers.find((sk) => sk.id === id);
+
+  const ordersList = useMemo(() => {
+    if (!shopkeeper) return [];
+    if (Array.isArray(shopkeeper.orders) && shopkeeper.orders.length > 0) {
+      return shopkeeper.orders;
+    }
+    const initialAmt = Number(shopkeeper.billAmount || shopkeeper.totalOutstanding || 0);
+    if (initialAmt > 0 || shopkeeper.invoiceNumber || shopkeeper.challanNumber) {
+      return [{
+        orderId: 'ord_init',
+        amount: initialAmt,
+        billingType: shopkeeper.billingType || (shopkeeper.challanNumber ? 'without_bill' : 'with_bill'),
+        invoiceNumber: shopkeeper.invoiceNumber || 'INV-GENERAL',
+        challanNumber: shopkeeper.challanNumber || '',
+        deliveryDate: shopkeeper.deliveryDate || shopkeeper.invoiceDate || shopkeeper.createdAt?.split('T')[0] || getTodayString(),
+        dueDate: shopkeeper.dueDate || '',
+      }];
+    }
+    return [];
+  }, [shopkeeper]);
 
   const skPayments = useMemo(() => {
     return payments.filter((p) => p.shopkeeperId === id);
@@ -102,6 +125,15 @@ export function ShopkeeperDetailPage() {
           </Button>
 
           <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => setIsAddOrderOpen(true)}
+          >
+            Add New Order
+          </Button>
+
+          <Button
             variant="emerald"
             size="sm"
             icon={Receipt}
@@ -133,32 +165,6 @@ export function ShopkeeperDetailPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-y-1.5 gap-x-4 text-xs text-slate-400">
-              <div className="flex items-center gap-1.5">
-                <User className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-slate-200 font-semibold">{shopkeeper.ownerName || 'Proprietor'}</span>
-              </div>
-
-              {/* Billing Category Pill */}
-              {(shopkeeper.billingType === 'without_bill' || !!shopkeeper.challanNumber) ? (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                  <Package className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Without Bill Challan: <strong className="text-white font-mono">#{shopkeeper.challanNumber || shopkeeper.invoiceNumber || 'CH-GENERAL'}</strong></span>
-                </div>
-              ) : (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-brand-500/15 text-brand-300 border border-brand-500/30">
-                  <FileText className="w-3.5 h-3.5 text-brand-400" />
-                  <span>Tax Invoice: <strong className="text-white font-mono">#{shopkeeper.invoiceNumber || 'INV-GENERAL'}</strong></span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-1.5">
-                <Truck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Goods Delivered: <strong className="text-white">{formatDate(shopkeeper.deliveryDate || shopkeeper.invoiceDate || shopkeeper.createdAt)}</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-400" />
-                <span>Credit Terms: {shopkeeper.creditDays || 39} Days</span>
-              </div>
               {shopkeeper.gstNumber && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-slate-500">GST:</span>
@@ -166,41 +172,23 @@ export function ShopkeeperDetailPage() {
                 </div>
               )}
             </div>
-
-            {shopkeeper.address && (
-              <p className="text-xs text-slate-400 max-w-xl">{shopkeeper.address}</p>
-            )}
           </div>
 
-          {/* Bill Amount, Paid Amount & Due Amount Box */}
-          <div className="p-4 rounded-xl bg-slate-950/90 border border-slate-800 lg:min-w-[300px] space-y-3">
-            <div className="grid grid-cols-2 gap-3 pb-3 border-b border-slate-800/80">
-              <div>
-                <span className="text-[11px] text-slate-400 font-medium block">Total Bill Amount:</span>
-                <span className="text-lg font-extrabold text-white font-sans">
-                  {formatINR(totalBillAmount)}
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="text-[11px] text-emerald-400 font-semibold block">Paid Amount:</span>
-                <span className="text-lg font-extrabold text-emerald-400 font-sans">
-                  {formatINR(totalPaid)}
-                </span>
-              </div>
+          {/* Outstanding Balance Hero Block */}
+          <div className="flex flex-row lg:flex-col items-center lg:items-end justify-between p-4 rounded-2xl bg-slate-950/60 border border-slate-800">
+            <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Total Market Due</span>
+            <div className="text-2xl sm:text-3xl font-extrabold text-amber-400 font-sans tracking-tight">
+              {formatINR(outstanding)}
             </div>
-
-            <div className="flex items-baseline justify-between pt-1">
-              <span className="text-xs text-amber-400 font-semibold">Total Due Amount:</span>
-              <span className={`text-2xl font-extrabold font-sans ${outstanding > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                {formatINR(outstanding)}
-              </span>
-            </div>
+            <span className="text-[11px] text-slate-400 font-medium">
+              Billed: {formatINR(totalBillAmount)} • Paid: {formatINR(totalPaid)}
+            </span>
           </div>
         </div>
 
-        {/* Quick Contact & Action Buttons */}
+        {/* Quick Communication Bar */}
         <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <a
               href={generateTelUrl(shopkeeper.phone)}
               onClick={() => {
@@ -250,6 +238,18 @@ export function ShopkeeperDetailPage() {
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
         <button
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'orders'
+              ? 'bg-brand-500 text-white shadow-md'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+          }`}
+        >
+          <ShoppingBag className="w-4 h-4" />
+          <span>Orders & Invoices ({ordersList.length})</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('payments')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'payments'
@@ -274,7 +274,83 @@ export function ShopkeeperDetailPage() {
         </button>
       </div>
 
-      {/* Tab 1: Payments History */}
+      {/* Tab 1: Orders / Purchases History */}
+      {activeTab === 'orders' && (
+        <div className="space-y-3">
+          {ordersList.length === 0 ? (
+            <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-800 text-center">
+              <p className="text-xs text-slate-400">No goods orders or invoices recorded yet.</p>
+              <Button
+                variant="primary"
+                size="sm"
+                className="mt-3"
+                icon={Plus}
+                onClick={() => setIsAddOrderOpen(true)}
+              >
+                Record First Order
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-900/90 shadow-xl">
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="bg-slate-950/80 text-[11px] font-bold uppercase text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">#</th>
+                    <th className="py-3 px-4">Invoice / Challan #</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Goods Delivered Date</th>
+                    <th className="py-3 px-4">Credit Due Date</th>
+                    <th className="py-3 px-4 text-right">Order Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 bg-slate-900/40">
+                  {ordersList.map((order, idx) => {
+                    const isWithoutBill = order.billingType === 'without_bill' || !!order.challanNumber;
+                    const docNumber = isWithoutBill
+                      ? (order.challanNumber || order.invoiceNumber || 'CH-GENERAL')
+                      : (order.invoiceNumber || 'INV-GENERAL');
+
+                    return (
+                      <tr key={order.orderId || idx} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-3.5 px-4 font-mono text-slate-500 font-bold">{idx + 1}</td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          <span className="font-mono font-bold text-white px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-xs">
+                            #{docNumber}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {isWithoutBill ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                              <Package className="w-3 h-3" />
+                              Without Bill
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-full border border-brand-500/20">
+                              <FileText className="w-3 h-3" />
+                              With Bill (GST)
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap">
+                          {formatDate(order.deliveryDate || order.createdAt)}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-300 whitespace-nowrap">
+                          {order.dueDate ? formatDate(order.dueDate) : '—'}
+                        </td>
+                        <td className="py-3.5 px-4 text-right font-extrabold text-amber-400 font-sans text-sm whitespace-nowrap">
+                          {formatINR(order.amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab 2: Payments History */}
       {activeTab === 'payments' && (
         <div className="space-y-3">
           {skPayments.length === 0 ? (
@@ -419,6 +495,17 @@ export function ShopkeeperDetailPage() {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         initialData={shopkeeper}
+      />
+
+      {/* Add Repeat Order Modal */}
+      <ShopkeeperFormModal
+        isOpen={isAddOrderOpen}
+        onClose={() => setIsAddOrderOpen(false)}
+        initialData={{
+          shopName: shopkeeper.shopName,
+          phone: shopkeeper.phone,
+          billingType: shopkeeper.billingType,
+        }}
       />
 
       {/* Delete Shopkeeper Dialog */}

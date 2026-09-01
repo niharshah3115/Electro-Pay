@@ -86,7 +86,6 @@ export function InvoiceDetailModal({
           <div className="space-y-1 sm:border-l sm:border-slate-800 sm:pl-4">
             <span className="text-[10px] uppercase font-bold text-slate-400">Retailer (Billed To)</span>
             <p className="font-bold text-white text-sm">{invoice.shopkeeperName}</p>
-            <p className="text-slate-400">Proprietor: {shopkeeper?.ownerName || 'Retail Customer'}</p>
             <p className="text-slate-400">Phone: {invoice.shopkeeperPhone || shopkeeper?.phone}</p>
             <p className="text-slate-400">Route: {shopkeeper?.areaRoute || 'Market'}</p>
           </div>
